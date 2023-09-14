@@ -11,12 +11,13 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/MSM_v1.14-experimental.jar!/" />
+          <root url="jar://$MODULE_DIR$/MSM_v1.15_rc.jar!/" />
         </CLASSES>
         <JAVADOC />
-        <SOURCES />
+        <SOURCES>
+          <root url="jar://$MODULE_DIR$/MSM_v1.15_rc.jar!/" />
+        </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="library" name="MSM_v1.14" level="project" />
   </component>
 </module>

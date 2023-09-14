@@ -1,10 +1,10 @@
 import moulton.scalable.clickables.Button
-import moulton.scalable.clickables.Clickable
 import moulton.scalable.clickables.EventAction
 import moulton.scalable.containers.MenuManager
 import moulton.scalable.containers.Panel
 import moulton.scalable.texts.Alignment
 import moulton.scalable.texts.Caption
+import moulton.scalable.texts.StaticTextBox
 import moulton.scalable.texts.TextBox
 import moulton.scalable.texts.TextFormat
 import java.awt.Color
@@ -12,6 +12,7 @@ import java.awt.Font
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
+import kotlin.math.min
 
 class FpMenuManager(game: FloatingPoint): MenuManager(game) {
     private var boxes : Array<TextBox>? = null
@@ -31,7 +32,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         val space = "5"
         quickPanel.gridFormatter.setFrame(space, space)
         quickPanel.gridFormatter.setMargin(space, space)
-        val fp32 = Button(null, "FP32", quickPanel, 1, 0, font, Color.GREEN)
+        val fp32 = Button("FP32", quickPanel, 1, 0, font, Color.GREEN)
         addTouchComponent(fp32)
         fp32.clickAction = EventAction {
             exponent!!.message = "8"
@@ -39,7 +40,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             refresh()
             true
         }
-        val fp16 = Button(null, "FP16", quickPanel, 0, 0, font, Color.GREEN)
+        val fp16 = Button("FP16", quickPanel, 0, 0, font, Color.GREEN)
         addTouchComponent(fp16)
         fp16.clickAction = EventAction {
             exponent!!.message = "5"
@@ -47,7 +48,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             refresh()
             true
         }
-        val fp64 = Button(null, "FP64", quickPanel, 2, 0, font, Color.GREEN)
+        val fp64 = Button("FP64", quickPanel, 2, 0, font, Color.GREEN)
         addTouchComponent(fp64)
         fp64.clickAction = EventAction {
             exponent!!.message = "11"
@@ -56,28 +57,28 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             true
         }
         val valPanel = Panel(botTopPanel, 1, 0, null)
-        val inf = Button(null, "inf", valPanel, 0, 0, font, Color.ORANGE)
+        val inf = Button("inf", valPanel, 0, 0, font, Color.ORANGE)
         addTouchComponent(inf)
         inf.clickAction = EventAction {
             boxes!![3].message = "inf"
             refresh()
             true
         }
-        val ninf = Button(null, "-inf", valPanel, 1, 0, font, Color.ORANGE)
+        val ninf = Button("-inf", valPanel, 1, 0, font, Color.ORANGE)
         addTouchComponent(ninf)
         ninf.clickAction = EventAction {
             boxes!![3].message = "-inf"
             refresh()
             true
         }
-        val nan = Button(null, "nan", valPanel, 2, 0, font, Color.ORANGE)
+        val nan = Button("nan", valPanel, 2, 0, font, Color.ORANGE)
         addTouchComponent(nan)
         nan.clickAction = EventAction {
             boxes!![3].message = "nan"
             refresh()
             true
         }
-        val zero = Button(null, "0", valPanel, 3, 0, font, Color.ORANGE)
+        val zero = Button("0", valPanel, 3, 0, font, Color.ORANGE)
         addTouchComponent(zero)
         zero.clickAction = EventAction {
             boxes!![3].message = "0"
@@ -99,22 +100,54 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         val hex = object : TextFormat() {
             override fun isValidChar(c: Char): Boolean =
                 (c in '0'..'9') || (c in 'a'..'f') || (c in 'A'..'F') || c == ' '
+
             override fun emptyText(): String = "0"
         }
         val dec = object : TextFormat() {
-            override fun isValidChar(c: Char): Boolean =
-                (c in '0'..'9') || c == '-' || c == '.' || c == 'E' || c == 'e'
-                        // to allow for inf and nan
-                        || c == 'i' || c == 'n' || c == 'f' || c == 'a'
+            var box : TextBox? = null
+
+            override fun isValidChar(c: Char): Boolean {
+                if (c in '0' .. '9')
+                    return true
+                var msg = box!!.message
+                if (c == '.') {
+                    // can only see one . in the whole message
+                    for (cc in msg) {
+                        if (cc == '.')
+                            return false
+                    }
+                    return true
+                }
+                // - must be first, before anything
+                var first = msg.isEmpty()
+                if (first && c == '-')
+                    return true
+                if (msg.startsWith("-")) {
+                    first = msg.length == 1 // ignore leading negative, doesn't affect first-ness
+                    msg = msg.substring(1)
+                }
+                if (first) {
+                    // can see ., i, n here
+                    return c == 'i' || c == 'n'
+                }else if (msg == "i" && c == 'n')
+                    return true
+                else if (msg == "in" && c == 'f')
+                    return true
+                else if (msg == "n" && c == 'a')
+                    return true
+                else if (msg == "na" && c == 'n')
+                    return true
+                return false
+            }
             override fun emptyText(): String = "0"
         }
-        val decBox = addRepresentation(captions, boxes, 2, "Decimal")
-        decBox.isEnabled = false
+        val font2 = addRepresentation(captions, 2, "Decimal")
         this.boxes = arrayOf(
             addRepresentation(captions, boxes, 0, "Binary", bin),
             addRepresentation(captions, boxes, 1, "Hexadecimal", hex),
-            decBox,
+            StaticTextBox("0", boxes, 0, 2, font2, Color.WHITE),
             addRepresentation(captions, boxes, 3, "Pretty", dec))
+        dec.box = this.boxes!![3]
 
         // start with FP32
         exponent!!.message = "8"
@@ -126,25 +159,29 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         val font = Font("Arial", Font.PLAIN, 18)
         val idx = offs * 3
         Caption("$label:", precPanel, idx, 0, font, Alignment.CENTER_ALIGNMENT)
-        val box = TextBox("precision", "1", precPanel, idx + 1, 0, font, Color.LIGHT_GRAY)
-        box.acceptEnter(false)
-        box.deselectOnEnter(true)
+        val box = TextBox("1", precPanel, idx + 1, 0, font, Color.LIGHT_GRAY)
+        box.acceptEnter = false
+        box.deselectOnEnter = true
         box.message = "0"
         box.textFormat = object : TextFormat() {
             override fun isValidChar(c: Char): Boolean = c in '0'..'9'
             override fun emptyText(): String = "1" // precisions must >= 1
         }
+        box.lostFocusAction = EventAction {
+            refresh()
+            true
+        }
         addTouchComponent(box)
         precPanel.gridFormatter.specifyColumnWeight(idx + 1, 3.0)
         val updownPanel = Panel(precPanel, idx + 2, 0, null)
-        val up = Button(null, "^", updownPanel, 0, 0, font, Color.GRAY)
+        val up = Button("^", updownPanel, 0, 0, font, Color.GRAY)
         up.clickAction = EventAction {
             box.message = (box.message.toInt() + 1).toString()
             refresh(3)
             true
         }
         addTouchComponent(up)
-        val down = Button(null, "v", updownPanel, 0, 1, font, Color.GRAY)
+        val down = Button("v", updownPanel, 0, 1, font, Color.GRAY)
         down.clickAction = EventAction {
             val num = box.message.toInt()
             if (num > 1)
@@ -157,19 +194,22 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
     }
 
     private fun addRepresentation(captions: Panel, boxes: Panel, i: Int, type: String, tf: TextFormat): TextBox {
-        val box = addRepresentation(captions, boxes, i, type)
+        val font = addRepresentation(captions, i, type)
+        val box = TextBox("0", boxes, 0, i, font, Color.LIGHT_GRAY)
+        box.lostFocusAction = EventAction {
+            refresh(i)
+            true
+        }
+        addTouchComponent(box)
+        box.acceptEnter = false
+        box.deselectOnEnter = true
         box.textFormat = tf
         return box
     }
-    private fun addRepresentation(captions: Panel, boxes: Panel, i: Int, type: String): TextBox {
+    private fun addRepresentation(captions: Panel, i: Int, type: String): Font {
         val font = Font("Arial", Font.PLAIN, 18)
         Caption(" $type:", captions, 0, i, font, Alignment.LEFT_ALIGNMENT)
-        val box = TextBox("box$i", "", boxes, 0, i, font, Color.LIGHT_GRAY)
-        addTouchComponent(box)
-        box.acceptEnter(false)
-        box.deselectOnEnter(true)
-        box.message = "0"
-        return box
+        return font
     }
 
     private fun refresh(trigger: Int = 3, setExact: Boolean = false) {
@@ -364,18 +404,5 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         if (binNum[0] == '1')
             combo = "-$combo"
         return combo
-    }
-
-    override fun clickableAction(c: Clickable?) {}
-
-    override fun lostFocusAction(c: Clickable?) {
-        val cc = c!!
-        if (cc.id == null)
-            return
-        if (cc.id.equals("precision"))
-            refresh()
-        if (cc.id.startsWith("box")) {
-            refresh(cc.id.substring(3).toInt())
-        }
     }
 }
