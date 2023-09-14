@@ -334,10 +334,87 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 bits[nexp + 1] = true
             }
             done = true
-        }
+        }else if (dec.isEmpty() || dec.contains('i') || dec.contains('n')
+                || dec.contains('f') || dec.contains('a'))
+            dec = "0" // error turns to 0
 
         if (!done) {
-            //TODO("non-trivial decimal to binary conv")
+            // Convert the whole number to binary
+            var decc = BigDecimal(dec)
+            val zero = BigDecimal(0)
+            // If our decimal number is 0, we are done. 0 = all off
+            if (decc.compareTo(zero) != 0) {
+                val one = BigDecimal(1)
+                val two = BigDecimal(2)
+                var run = one
+                val cache = ArrayList<BigDecimal>(nexp + 1)
+                cache.add(one)
+                while (decc >= run) {
+                    run *= two
+                    cache.add(run)
+                }
+                val bin = ArrayList<Boolean>()
+                var denormal = true
+                for (i in cache.size - 2 downTo 0) {
+                    if (decc >= cache[i]) {
+                        bin.add(true)
+                        decc -= cache[i]
+                        denormal = false
+                    }else
+                        bin.add(false)
+                }
+                // The decimal is at bin.size, but we need to move it to scientific notation,
+                // which leaves just a 1 (or a 0 for denormal mode) before it
+                var decMove = bin.size - 1
+                if (decc > zero) {
+                    // keep going into the decimal.
+                    run = one
+                    while (decc > zero) {
+                        run = run.divide(two, MathContext.UNLIMITED)
+                        if (decc >= run) {
+                            decc -= run
+                            bin.add(true)
+                            denormal = false // no longer counting decimal moves
+                        } else {
+                            if (denormal)
+                                decMove--
+                            else
+                                bin.add(false)
+                        }
+                        // Don't need to go further than our precision will allow
+                        if (bin.size > nmant)
+                            break
+                    }
+                }
+                // Now we need to create the exponent:
+                // (2 ^ nexp) - 1 + decMove = exponent
+                // If exponent >= 2 ^ (nexp + 1) - 1, we round to infinity
+                // We kept a cache of powers of two earlier. Maybe we can fetch the values we need
+                run = cache[cache.size - 1]
+                // continue multiplying until we get the values we need
+                while (cache.size < nexp + 1) {
+                    run *= two
+                    cache.add(run)
+                }
+                val expMax = cache[nexp] - one
+                var exp = (cache[nexp - 1] - one) + BigDecimal(decMove)
+                if (exp > expMax) {
+                    // Set all exponent bits to represent infinity
+                    for (i in 1..nexp)
+                        bits[i] = true
+                } else {
+                    // Convert exp into binary while translating value into bits array
+                    for (i in nexp - 1 downTo 0) {
+                        if (exp >= cache[i]) {
+                            exp -= cache[i]
+                            bits[nexp - i] = true
+                        }
+                    }
+                }
+                // finally, set the mantissa, which is a straight copy across from bin (except leading 1)
+                for (i in 1 until min(bin.size, nmant))
+                    bits[nexp + i] = bin[i]
+            }
         }
 
         val ret = StringBuilder(bits.size)
@@ -398,9 +475,24 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             mantRun = mantRun.divide(two, MathContext.UNLIMITED)
         }
 
-        var combo = (expVal * mantissa).toString()
+        var combo = (expVal * mantissa).toString() // Kotlin will do dec -> string for us. Thanks!
+        // Clean up some of its weird output:
         if (combo.startsWith("0E-"))
             combo = "0"
+        // remove trailing 0's, if any
+        if (combo.indexOf('.') != -1) {
+            var trail = combo.length - 1
+            for (i in trail downTo 0) {
+                trail = i
+                if (combo[i] == '.') {
+                    trail = i - 1 // delete the trailing . then quit
+                    break
+                }
+                if (combo[i] != '0')
+                    break
+            }
+            combo = combo.substring(0, trail + 1)
+        }
         if (binNum[0] == '1')
             combo = "-$combo"
         return combo
