@@ -355,8 +355,12 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 }
                 val bin = ArrayList<Boolean>()
                 var denormal = true
+                var earlyBreak = 0
                 for (i in cache.size - 2 downTo 0) {
-                    if (decc >= cache[i]) {
+                    if (bin.size > nmant) { // don't go further than our precision allows
+                        earlyBreak = i + 1
+                        break
+                    }else if (decc >= cache[i]) {
                         bin.add(true)
                         decc -= cache[i]
                         denormal = false
@@ -365,8 +369,8 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 }
                 // The decimal is at bin.size, but we need to move it to scientific notation,
                 // which leaves just a 1 (or a 0 for denormal mode) before it
-                var decMove = bin.size - 1
-                if (decc > zero) {
+                var decMove = bin.size + earlyBreak - 1
+                if (earlyBreak == 0 && decc > zero) {
                     // keep going into the decimal.
                     run = one
                     while (decc > zero) {
@@ -412,7 +416,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                     }
                 }
                 // finally, set the mantissa, which is a straight copy across from bin (except leading 1)
-                for (i in 1 until min(bin.size, nmant))
+                for (i in 1 until min(bin.size, nmant + 1))
                     bits[nexp + i] = bin[i]
             }
         }
@@ -469,7 +473,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
 
         var mantissa = if (denormal) BigDecimal(0) else BigDecimal(1)
         var mantRun = BigDecimal("0.5")
-        for (i in (nexp + 1) until (nexp + nmant)) {
+        for (i in (nexp + 1) .. (nexp + nmant)) {
             if (binNum[i] == '1')
                 mantissa += mantRun
             mantRun = mantRun.divide(two, MathContext.UNLIMITED)
