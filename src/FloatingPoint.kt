@@ -1,4 +1,3 @@
-
 import moulton.scalable.containers.Container
 import moulton.scalable.containers.MenuManager
 import java.awt.Cursor
@@ -9,7 +8,6 @@ import java.awt.event.*
 import java.util.*
 import javax.swing.JFrame
 import javax.swing.JPanel
-
 
 fun main() {
     FloatingPoint()
@@ -35,8 +33,7 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
         addMouseMotionListener(this)
         addMouseWheelListener(this)
 
-        //start run loop so the screen can refresh
-        run()
+        run() //start run loop so the screen can refresh
     }
 
     private fun run() {
@@ -65,17 +62,11 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
         requestFocus()
     }
 
-    override fun getPreferredSize(): Dimension? {
-        return Dimension(500, 200)
-    }
+    override fun getPreferredSize() = Dimension(500, 200)
 
-    override fun getMenuWidth(): Int {
-        return width;
-    }
+    override fun getMenuWidth() = width
 
-    override fun getMenuHeight(): Int {
-        return height;
-    }
+    override fun getMenuHeight() = height
 
     override fun setCursor(cursorType: Int) {
         frame.cursor = Cursor.getPredefinedCursor(cursorType)
