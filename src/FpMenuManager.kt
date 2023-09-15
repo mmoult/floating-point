@@ -446,7 +446,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         if (special) {
             // All exponent bits set signals special
             // If any of the mantissa bits are set, this is nan, else, inf or -inf
-            for (i in (nexp + 1) until (nexp + nmant)) {
+            for (i in (nexp + 1) until (nexp + nmant + 1)) {
                 if (binNum[i] == '1')
                     return "nan" // there is no such thing as -nan, so don't check sign bit
             }
