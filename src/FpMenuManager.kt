@@ -338,7 +338,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 || dec.contains('f') || dec.contains('a'))
             dec = "0" // error turns to 0
 
-        if (!done) {
+        process@while (!done) {
             // Convert the whole number to binary
             var decc = BigDecimal(dec)
             val zero = BigDecimal(0)
@@ -356,6 +356,8 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 val bin = ArrayList<Boolean>()
                 var denormal = true
                 var earlyBreak = 0
+                // No entry at size. Skip size-1 since it is larger than the input.
+                // Therefore, start with size-2
                 for (i in cache.size - 2 downTo 0) {
                     if (bin.size > nmant) { // don't go further than our precision allows
                         earlyBreak = i + 1
@@ -393,9 +395,11 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 // Now we need to create the exponent:
                 // (2 ^ nexp) - 1 + decMove = exponent
                 // If exponent >= 2 ^ (nexp + 1) - 1, we round to infinity
-                // We kept a cache of powers of two earlier. Maybe we can fetch the values we need
+                // (Recall we cannot have all exponent bits on since that is inf or nan.)
+
+                // We kept a cache of powers of two earlier. Use it to fetch the values needed now
                 run = cache[cache.size - 1]
-                // continue multiplying until we get the values we need
+                // extend the cache as needed
                 while (cache.size < nexp + 1) {
                     run *= two
                     cache.add(run)
@@ -406,6 +410,8 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                     // Set all exponent bits to represent infinity
                     for (i in 1..nexp)
                         bits[i] = true
+                    // skip setting the mantissa bits
+                    break@process
                 } else {
                     // Convert exp into binary while translating value into bits array
                     for (i in nexp - 1 downTo 0) {
@@ -419,6 +425,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 for (i in 1 until min(bin.size, nmant + 1))
                     bits[nexp + i] = bin[i]
             }
+            done = true
         }
 
         val ret = StringBuilder(bits.size)
