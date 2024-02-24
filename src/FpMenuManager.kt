@@ -322,23 +322,19 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             bits[0] = true
             dec = decNum.substring(1)
         }
-        var done = false
+        var done = 0
         if (dec == "inf" || dec == "nan") {
-            // Set all exponent bits
-            for (i in 1..nexp)
-                bits[i] = true
-
             if (dec == "nan") {
-                // Set one of the mantissa bits too.
+                // Set one of the mantissa bits.
                 // Since it doesn't make any difference which, set the first
                 bits[nexp + 1] = true
             }
-            done = true
+            done = 2
         }else if (dec.isEmpty() || dec.contains('i') || dec.contains('n')
                 || dec.contains('f') || dec.contains('a'))
             dec = "0" // error turns to 0
 
-        process@while (!done) {
+        process@while (done == 0) {
             // Convert the whole number to binary
             var decc = BigDecimal(dec)
             val zero = BigDecimal(0)
@@ -372,26 +368,46 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 // The decimal is at bin.size, but we need to move it to scientific notation,
                 // which leaves just a 1 (or a 0 for denormal mode) before it
                 var decMove = bin.size + earlyBreak - 1
-                if (earlyBreak == 0 && decc > zero) {
-                    // keep going into the decimal.
-                    run = one
-                    while (decc > zero) {
-                        run = run.divide(two, MathContext.UNLIMITED)
-                        if (decc >= run) {
-                            decc -= run
-                            bin.add(true)
-                            denormal = false // no longer counting decimal moves
-                        } else {
-                            if (denormal)
-                                decMove--
-                            else
-                                bin.add(false)
+                if (decc > zero) {
+                    // Continue where possible to refine the current mantissa value
+                    if (earlyBreak == 0) {
+                        // If we did not break early, we may have more precision bits to use. Thus, go into the decimal
+                        run = one
+                        while (decc > zero) {
+                            run = run.divide(two, MathContext.UNLIMITED)
+                            // Don't need to go further than our precision will allow
+                            if (bin.size > nmant)
+                                break
+
+                            if (decc >= run) {
+                                decc -= run
+                                bin.add(true)
+                                denormal = false // no longer counting decimal moves
+                            } else {
+                                if (denormal)
+                                    decMove--
+                                else
+                                    bin.add(false)
+                            }
                         }
-                        // Don't need to go further than our precision will allow
-                        if (bin.size > nmant)
-                            break
+                    }else
+                        run = cache[earlyBreak]
+
+                    // If we still aren't exactly there, try rounding the bits we currently have
+                    if (decc > zero && decc >= run) {
+                        for (i in bin.size - 1 downTo 0) {
+                            if (!bin[i]) {
+                                // Round this up to 1 and all bits below to 0
+                                bin[i] = true
+                                for (j in i + 1 until bin.size)
+                                    bin[j] = false
+                                break
+                            }
+                        }
+                        // If all the bin bits were true, we cannot round (next num is inf)
                     }
                 }
+
                 // Now we need to create the exponent:
                 // (2 ^ nexp) - 1 + decMove = exponent
                 // If exponent >= 2 ^ (nexp + 1) - 1, we round to infinity
@@ -407,10 +423,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 val expMax = cache[nexp] - one
                 var exp = (cache[nexp - 1] - one) + BigDecimal(decMove)
                 if (exp > expMax) {
-                    // Set all exponent bits to represent infinity
-                    for (i in 1..nexp)
-                        bits[i] = true
-                    // skip setting the mantissa bits
+                    done = 2 // round up to infinity
                     break@process
                 } else {
                     // Convert exp into binary while translating value into bits array
@@ -425,7 +438,13 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 for (i in 1 until min(bin.size, nmant + 1))
                     bits[nexp + i] = bin[i]
             }
-            done = true
+            done = 1
+        }
+
+        if (done == 2) {
+            // Set all exponent bits
+            for (i in 1..nexp)
+                bits[i] = true
         }
 
         val ret = StringBuilder(bits.size)
