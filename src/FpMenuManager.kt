@@ -486,10 +486,9 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             mantRun = mantRun.divide(two, MathContext.UNLIMITED)
         }
 
-        var combo = (expVal * mantissa).toString() // Kotlin will do dec -> string for us. Thanks!
+        // BigDecimal will print to string for us, using plain avoids scientific notation
+        var combo = (expVal * mantissa).toPlainString()
         // Clean up some of its weird output:
-        if (combo.startsWith("0E-"))
-            combo = "0"
         // remove trailing 0's, if any
         if (combo.indexOf('.') != -1) {
             var trail = combo.length - 1
