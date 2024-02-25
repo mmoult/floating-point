@@ -9,10 +9,6 @@ import moulton.scalable.texts.TextBox
 import moulton.scalable.texts.TextFormat
 import java.awt.Color
 import java.awt.Font
-import java.math.BigDecimal
-import java.math.BigInteger
-import java.math.MathContext
-import kotlin.math.min
 
 class FpMenuManager(game: FloatingPoint): MenuManager(game) {
     private var boxes : Array<TextBox>? = null
@@ -22,17 +18,19 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
     override fun createMenu() {
         this.menu = Panel.createRoot(Color.WHITE)
         val font = Font("Arial", Font.PLAIN, 18)
-        val topPanel = Panel(menu, "0", "0", "width", "height/3", null)
+        val topPanel = Panel(menu, 0, 0, null)
+        // panel for holding precision controls
         val precPanel = Panel(topPanel, 0, 0, Color.YELLOW)
         exponent = addPrecComps(precPanel, "E", 0)
         mantissa = addPrecComps(precPanel, "M", 1)
 
-        val botTopPanel = Panel(topPanel, 0, 1, null)
-        val quickPanel = Panel(botTopPanel, 0, 0, null)
+        val buttonPanel = Panel(topPanel, 0, 1, null)
+        topPanel.gridFormatter.specifyRowWeight(1, 2.0)
+        val leftButtonsPanel = Panel(buttonPanel, 0, 0, null)
         val space = "5"
-        quickPanel.gridFormatter.setFrame(space, space)
-        quickPanel.gridFormatter.setMargin(space, space)
-        val fp32 = Button("FP32", quickPanel, 1, 0, font, Color.GREEN)
+        leftButtonsPanel.gridFormatter.setFrame(space, space)
+        leftButtonsPanel.gridFormatter.setMargin(space, space)
+        val fp32 = Button("FP32", leftButtonsPanel, 1, 0, font, Color.GREEN)
         addTouchComponent(fp32)
         fp32.clickAction = EventAction {
             exponent!!.message = "8"
@@ -40,7 +38,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             refresh()
             true
         }
-        val fp16 = Button("FP16", quickPanel, 0, 0, font, Color.GREEN)
+        val fp16 = Button("FP16", leftButtonsPanel, 0, 0, font, Color.GREEN)
         addTouchComponent(fp16)
         fp16.clickAction = EventAction {
             exponent!!.message = "5"
@@ -48,7 +46,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             refresh()
             true
         }
-        val fp64 = Button("FP64", quickPanel, 2, 0, font, Color.GREEN)
+        val fp64 = Button("FP64", leftButtonsPanel, 2, 0, font, Color.GREEN)
         addTouchComponent(fp64)
         fp64.clickAction = EventAction {
             exponent!!.message = "11"
@@ -56,40 +54,90 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             refresh()
             true
         }
-        val valPanel = Panel(botTopPanel, 1, 0, null)
-        val inf = Button("inf", valPanel, 0, 0, font, Color.ORANGE)
+        val handler = NumberHandler()
+        val negate = Button("-/+", leftButtonsPanel, 0, 1, font, Color.PINK)
+        addTouchComponent(negate)
+        negate.clickAction = EventAction {
+            val prev = boxes!![3].message
+            setBox(3, if (prev.startsWith("-"))
+                prev.substring(1)
+            else
+                "-$prev")
+            true
+        }
+        val addOne = Button("+1", leftButtonsPanel, 1, 1, font, Color.PINK)
+        addTouchComponent(addOne)
+        addOne.clickAction = EventAction {
+            setBox(0, handler.increment(boxes!![0].message, exponent!!.message.toInt(), true))
+            true
+        }
+        val subOne = Button("-1", leftButtonsPanel, 2, 1, font, Color.PINK)
+        addTouchComponent(subOne)
+        subOne.clickAction = EventAction {
+            setBox(0, handler.increment(boxes!![0].message, exponent!!.message.toInt(), false))
+            true
+        }
+
+        // Panel for quick select of useful values
+        val rightButtonsPanel = Panel(buttonPanel, 1, 0, null)
+        val inf = Button("inf", rightButtonsPanel, 0, 0, font, Color.ORANGE)
         addTouchComponent(inf)
         inf.clickAction = EventAction {
-            boxes!![3].message = "inf"
-            refresh()
+            setBox(3, "inf")
             true
         }
-        val ninf = Button("-inf", valPanel, 1, 0, font, Color.ORANGE)
+        val ninf = Button("-inf", rightButtonsPanel, 1, 0, font, Color.ORANGE)
         addTouchComponent(ninf)
         ninf.clickAction = EventAction {
-            boxes!![3].message = "-inf"
-            refresh()
+            setBox(3, "-inf")
             true
         }
-        val nan = Button("nan", valPanel, 2, 0, font, Color.ORANGE)
+        val nan = Button("nan", rightButtonsPanel, 2, 0, font, Color.ORANGE)
         addTouchComponent(nan)
         nan.clickAction = EventAction {
-            boxes!![3].message = "nan"
-            refresh()
+            setBox(3, "nan")
             true
         }
-        val zero = Button("0", valPanel, 3, 0, font, Color.ORANGE)
+        val zero = Button("0", rightButtonsPanel, 3, 0, font, Color.ORANGE)
         addTouchComponent(zero)
         zero.clickAction = EventAction {
-            boxes!![3].message = "0"
-            refresh()
+            setBox(3, "0")
+            true
+        }
+        // The largest value representable by the float
+        val max = Button("max", rightButtonsPanel, 0, 1, font, Color.ORANGE)
+        addTouchComponent(max)
+        max.clickAction = EventAction {
+            setBox(0, handler.max(exponent!!.message.toInt(), mantissa!!.message.toInt()))
+            true
+        }
+        // The lowest point where ints can be exactly represented
+        val integer = Button("int", rightButtonsPanel, 1, 1, font, Color.ORANGE)
+        addTouchComponent(integer)
+        integer.clickAction = EventAction {
+            setBox(3, handler.intHigh(mantissa!!.message.toInt()))
+            true
+        }
+        // The lowest point, above which, no deltas below 1 can be represented
+        val decb = Button("dec", rightButtonsPanel, 2, 1, font, Color.ORANGE)
+        addTouchComponent(decb)
+        decb.clickAction = EventAction {
+            setBox(3, handler.decHigh(mantissa!!.message.toInt()))
+            true
+        }
+        // The lowest denorm value
+        val low = Button("low", rightButtonsPanel, 3, 1, font, Color.ORANGE)
+        addTouchComponent(low)
+        low.clickAction = EventAction {
+            setBox(0, handler.denormLow(exponent!!.message.toInt(), mantissa!!.message.toInt()))
             true
         }
 
-        valPanel.gridFormatter.setFrame(space, space)
-        valPanel.gridFormatter.setMargin(space, space)
+        rightButtonsPanel.gridFormatter.setFrame(space, space)
+        rightButtonsPanel.gridFormatter.setMargin(space, space)
 
-        val gridPan = Panel(this.menu, "0", "height/3", "width", "?height", null)
+        val gridPan = Panel(this.menu, 0, 1, null)
+        this.menu.gridFormatter.specifyRowWeight(1, 1.5)
         val partition = "120"
         val captions = Panel(gridPan, "0", "0", partition, "?height", Color.WHITE)
         val boxes = Panel(gridPan, partition, "0", "?width", "?height", Color.WHITE)
@@ -212,20 +260,26 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         return font
     }
 
+    private fun setBox(which: Int, msg: String) {
+        boxes!![which].message = msg
+        refresh(which)
+    }
+
     private fun refresh(trigger: Int = 3, setExact: Boolean = false) {
         val msg = boxes!![trigger].message.filterNot { it.isWhitespace() }
         val exponents = this.exponent!!.message.toInt()
         val mantissas = this.mantissa!!.message.toInt()
         val digits = 1 + exponents + mantissas
+        val handler = NumberHandler()
         // binMsg must have the correct length: pad if necessary
         val binMsg = when (trigger) {
-            0 -> padBinary(msg, digits) // fetch the binary directly
-            1 -> fromHex(msg, digits) // hex
-            3 -> fromDecimal(msg, exponents, mantissas) // exact decimal
+            0 -> handler.padBinary(msg, digits) // fetch the binary directly
+            1 -> handler.fromHex(msg, digits) // hex
+            3 -> handler.fromDecimal(msg, exponents, mantissas) // exact decimal
             else -> throw RuntimeException("Unhandled trigger type!")
         }
         // update all fields except exact (if it was the trigger)
-        val inDec = toDecimal(binMsg, exponents, mantissas)
+        val inDec = handler.toDecimal(binMsg, exponents, mantissas)
         for (i in 0..3) {
             when (i) {
                 0 -> {
@@ -267,263 +321,5 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 }
             }
         }
-    }
-
-    private fun padBinary(binNum: String, digits: Int): String {
-        val diff = digits - binNum.length
-        if (diff == 0)
-            return binNum
-        if (diff < 0)
-            return binNum.substring(0, digits)
-        val ret = StringBuilder(digits)
-        for (i in 0 until diff)
-            ret.append('0')
-        ret.append(binNum)
-        return ret.toString()
-    }
-
-    private fun fromHex(hexNum: String, digits: Int): String {
-        val bin = StringBuilder(digits)
-        val hex = if (hexNum.length * 4 > digits)
-            hexNum.substring(0, digits / 4)
-        else
-            hexNum
-        for (c in hex) {
-            val cc = if (c <= 'Z') c else (c - ('a' - 'A'))
-            bin.append(when (cc) {
-                '0' -> "0000"
-                '1' -> "0001"
-                '2' -> "0010"
-                '3' -> "0011"
-                '4' -> "0100"
-                '5' -> "0101"
-                '6' -> "0110"
-                '7' -> "0111"
-                '8' -> "1000"
-                '9' -> "1001"
-                'A' -> "1010"
-                'B' -> "1011"
-                'C' -> "1100"
-                'D' -> "1101"
-                'E' -> "1110"
-                'F' -> "1111"
-                else -> throw RuntimeException("Invalid char found in hex string!")
-            })
-        }
-        return padBinary(bin.toString(), digits)
-    }
-
-    private fun fromDecimal(decNum: String, nexp: Int, nmant: Int): String {
-        val bits = Array(nexp + nmant + 1) { false }
-        var dec = decNum
-
-        // the easiest bit is the sign
-        if (dec.startsWith('-')) {
-            bits[0] = true
-            dec = decNum.substring(1)
-        }
-        var done = 0
-        if (dec == "inf" || dec == "nan") {
-            if (dec == "nan") {
-                // Set one of the mantissa bits.
-                // Since it doesn't make any difference which, set the first
-                bits[nexp + 1] = true
-            }
-            done = 2
-        }else if (dec.isEmpty() || dec.contains('i') || dec.contains('n')
-                || dec.contains('f') || dec.contains('a'))
-            dec = "0" // error turns to 0
-
-        process@while (done == 0) {
-            // Convert the whole number to binary
-            var decc = BigDecimal(dec)
-            val zero = BigDecimal(0)
-            // If our decimal number is 0, we are done. 0 = all off
-            if (decc.compareTo(zero) != 0) {
-                val one = BigDecimal(1)
-                val two = BigDecimal(2)
-                var run = one
-                val cache = ArrayList<BigDecimal>(nexp + 1)
-                cache.add(one)
-                while (decc >= run) {
-                    run *= two
-                    cache.add(run)
-                }
-                val bin = ArrayList<Boolean>()
-                var denormal = true
-                var earlyBreak = 0
-                // No entry at size. Skip size-1 since it is larger than the input.
-                // Therefore, start with size-2
-                for (i in cache.size - 2 downTo 0) {
-                    if (bin.size > nmant) { // don't go further than our precision allows
-                        earlyBreak = i + 1
-                        break
-                    }else if (decc >= cache[i]) {
-                        bin.add(true)
-                        decc -= cache[i]
-                        denormal = false
-                    }else
-                        bin.add(false)
-                }
-                // The decimal is at bin.size, but we need to move it to scientific notation,
-                // which leaves just a 1 (or a 0 for denormal mode) before it
-                var decMove = bin.size + earlyBreak - 1
-                if (decc > zero) {
-                    // Continue where possible to refine the current mantissa value
-                    if (earlyBreak == 0) {
-                        // If we did not break early, we may have more precision bits to use. Thus, go into the decimal
-                        run = one
-                        while (decc > zero) {
-                            run = run.divide(two, MathContext.UNLIMITED)
-                            // Don't need to go further than our precision will allow
-                            if (bin.size > nmant)
-                                break
-
-                            if (decc >= run) {
-                                decc -= run
-                                bin.add(true)
-                                denormal = false // no longer counting decimal moves
-                            } else {
-                                if (denormal)
-                                    decMove--
-                                else
-                                    bin.add(false)
-                            }
-                        }
-                    }else
-                        run = cache[earlyBreak]
-
-                    // If we still aren't exactly there, try rounding the bits we currently have
-                    if (decc > zero && decc >= run) {
-                        for (i in bin.size - 1 downTo 0) {
-                            if (!bin[i]) {
-                                // Round this up to 1 and all bits below to 0
-                                bin[i] = true
-                                for (j in i + 1 until bin.size)
-                                    bin[j] = false
-                                break
-                            }
-                        }
-                        // If all the bin bits were true, we cannot round (next num is inf)
-                    }
-                }
-
-                // Now we need to create the exponent:
-                // (2 ^ nexp) - 1 + decMove = exponent
-                // If exponent >= 2 ^ (nexp + 1) - 1, we round to infinity
-                // (Recall we cannot have all exponent bits on since that is inf or nan.)
-
-                // We kept a cache of powers of two earlier. Use it to fetch the values needed now
-                run = cache[cache.size - 1]
-                // extend the cache as needed
-                while (cache.size < nexp + 1) {
-                    run *= two
-                    cache.add(run)
-                }
-                val expMax = cache[nexp] - one
-                var exp = (cache[nexp - 1] - one) + BigDecimal(decMove)
-                if (exp > expMax) {
-                    done = 2 // round up to infinity
-                    break@process
-                } else {
-                    // Convert exp into binary while translating value into bits array
-                    for (i in nexp - 1 downTo 0) {
-                        if (exp >= cache[i]) {
-                            exp -= cache[i]
-                            bits[nexp - i] = true
-                        }
-                    }
-                }
-                // finally, set the mantissa, which is a straight copy across from bin (except leading 1)
-                for (i in 1 until min(bin.size, nmant + 1))
-                    bits[nexp + i] = bin[i]
-            }
-            done = 1
-        }
-
-        if (done == 2) {
-            // Set all exponent bits
-            for (i in 1..nexp)
-                bits[i] = true
-        }
-
-        val ret = StringBuilder(bits.size)
-        for (bit in bits)
-            ret.append(if (bit) '1' else '0')
-        return ret.toString()
-    }
-
-    private fun toDecimal(binNum: String, nexp: Int, nmant: Int): String {
-        var expBits = BigInteger("0")
-        var expRun = BigInteger("1")
-        val one = BigInteger("1")
-        val itwo = BigInteger("2")
-        var special = true
-        var denormal = true
-        for (i in nexp downTo 1) {
-            if (binNum[i] == '1') {
-                expBits += expRun
-                denormal = false
-            }else
-                special = false
-            if (i > 1) // do not double on last iteration
-                expRun *= itwo
-        }
-        if (special) {
-            // All exponent bits set signals special
-            // If any of the mantissa bits are set, this is nan, else, inf or -inf
-            for (i in (nexp + 1) until (nexp + nmant + 1)) {
-                if (binNum[i] == '1')
-                    return "nan" // there is no such thing as -nan, so don't check sign bit
-            }
-            // If we get here, no mantissa bits were set
-            return if (binNum[0] == '0') "inf" else "-inf"
-        }
-        val expDiff = expRun - one
-        val exp = expBits - expDiff
-        // expVal = 2 ^ exp
-        var expVal = BigDecimal(1)
-        var count = BigInteger("0")
-        val two = BigDecimal(2)
-        if (exp >= count) {
-            while (exp > count) {
-                expVal *= two
-                count += one
-            }
-        }else {
-            while (exp < count) {
-                expVal = expVal.divide(two, MathContext.UNLIMITED)
-                count -= one
-            }
-        }
-
-        var mantissa = if (denormal) BigDecimal(0) else BigDecimal(1)
-        var mantRun = BigDecimal("0.5")
-        for (i in (nexp + 1) .. (nexp + nmant)) {
-            if (binNum[i] == '1')
-                mantissa += mantRun
-            mantRun = mantRun.divide(two, MathContext.UNLIMITED)
-        }
-
-        // BigDecimal will print to string for us, using plain avoids scientific notation
-        var combo = (expVal * mantissa).toPlainString()
-        // Clean up some of its weird output:
-        // remove trailing 0's, if any
-        if (combo.indexOf('.') != -1) {
-            var trail = combo.length - 1
-            for (i in trail downTo 0) {
-                trail = i
-                if (combo[i] == '.') {
-                    trail = i - 1 // delete the trailing . then quit
-                    break
-                }
-                if (combo[i] != '0')
-                    break
-            }
-            combo = combo.substring(0, trail + 1)
-        }
-        if (binNum[0] == '1')
-            combo = "-$combo"
-        return combo
     }
 }

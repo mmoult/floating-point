@@ -15,7 +15,7 @@ fun main() {
 
 class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotionListener, MouseWheelListener {
     private val frame: JFrame = JFrame("floating-point")
-    var manager: MenuManager = FpMenuManager(this)
+    private var manager: MenuManager = FpMenuManager(this)
     private var running = false
 
     init {
@@ -26,7 +26,7 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
         frame.setLocationRelativeTo(null)
         frame.minimumSize = preferredSize
         frame.isVisible = true
-        frame.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, Collections.emptySet());
+        frame.setFocusTraversalKeys(KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS, Collections.emptySet())
 
         addMouseListener(this)
         addKeyListener(this)
@@ -62,7 +62,7 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
         requestFocus()
     }
 
-    override fun getPreferredSize() = Dimension(500, 200)
+    override fun getPreferredSize() = Dimension(500, 250)
 
     override fun getMenuWidth() = width
 
@@ -75,12 +75,12 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
     override fun mouseClicked(e: MouseEvent?) {}
 
     override fun mousePressed(e: MouseEvent?) {
-        manager.mousePressed(e!!.x, e!!.y)
+        manager.mousePressed(e!!.x, e.y)
         repaint()
     }
 
     override fun mouseReleased(e: MouseEvent?) {
-        manager.mouseReleased(e!!.x, e!!.y)
+        manager.mouseReleased(e!!.x, e.y)
         repaint()
     }
 
@@ -94,24 +94,24 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
     }
 
     override fun keyPressed(e: KeyEvent?) {
-        manager.keyPressed(e!!.extendedKeyCode);
-        repaint();
+        manager.keyPressed(e!!.extendedKeyCode)
+        repaint()
     }
 
     override fun keyReleased(e: KeyEvent?) {}
 
     override fun mouseDragged(e: MouseEvent?) {
-        manager.mouseMoved(e!!.x, e!!.y)
+        manager.mouseMoved(e!!.x, e.y)
         repaint()
     }
 
     override fun mouseMoved(e: MouseEvent?) {
-        manager.mouseMoved(e!!.x, e!!.y)
+        manager.mouseMoved(e!!.x, e.y)
         repaint()
     }
 
     override fun mouseWheelMoved(e: MouseWheelEvent?) {
-        manager.mouseScrolled(e!!.x, e!!.y, e!!.wheelRotation)
+        manager.mouseScrolled(e!!.x, e.y, e.wheelRotation)
         repaint()
     }
 }
