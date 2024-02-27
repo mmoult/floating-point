@@ -279,7 +279,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             else -> throw RuntimeException("Unhandled trigger type!")
         }
         // update all fields except exact (if it was the trigger)
-        val inDec = handler.toDecimal(binMsg, exponents, mantissas)
+        val inDec = handler.toDecimal(binMsg, exponents)
         for (i in 0..3) {
             when (i) {
                 0 -> {

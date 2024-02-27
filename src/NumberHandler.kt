@@ -17,6 +17,13 @@ class NumberHandler {
         return ret.toString()
     }
 
+    /**
+     * Produces a binary string from the given hex string.
+     * @param hexNum the input hexadecimal to generate binary for
+     * @param digits the number of expected bits. If the hexadecimal string is too short, the binary will be padded with
+     * zeros. If the hexadecimal string is too long, it will be truncated.
+     * @return the equivalent binary from the input hex
+     */
     fun fromHex(hexNum: String, digits: Int): String {
         val bin = StringBuilder(digits)
         val hex = if (hexNum.length * 4 > digits)
@@ -48,6 +55,14 @@ class NumberHandler {
         return padBinary(bin.toString(), digits)
     }
 
+    /**
+     * Produces a binary string equivalent to the input decimal number (given as a string).
+     * @param decNum the decimal number to convert into float binary
+     * @param nexp the number of exponent bits given by the floating point configuration
+     * @param nmant the number of mantissa bits given by the floating point configuration
+     * @return the equivalent string in binary. It is assumed that one bit is allowed for the sign and that the three
+     * components (sign, exponent, mantissa), are in that order.
+     */
     fun fromDecimal(decNum: String, nexp: Int, nmant: Int): String {
         val bits = Array(nexp + nmant + 1) { false }
         var dec = decNum
@@ -149,26 +164,30 @@ class NumberHandler {
                 // If exponent >= 2 ^ (nexp + 1) - 1, we round to infinity
                 // (Recall we cannot have all exponent bits on since that is inf or nan.)
 
-                // We kept a cache of powers of two earlier. Use it to fetch the values needed now
-                run = cache[cache.size - 1]
-                // extend the cache as needed
-                while (cache.size < nexp + 1) {
-                    run *= two
-                    cache.add(run)
-                }
-                val expMax = cache[nexp] - one
-                var exp = (cache[nexp - 1] - one) + BigDecimal(decMove)
-                if (exp >= expMax) {
-                    done = 2 // round up to infinity
-                    break@process
-                } else {
-                    // Convert exp into binary while translating value into bits array
-                    for (i in nexp - 1 downTo 0) {
-                        if (exp >= cache[i]) {
-                            exp -= cache[i]
-                            bits[nexp - i] = true
+                if (decMove >= 0) { // if not denormal
+                    // We kept a cache of powers of two earlier. Use it to fetch the values needed now
+                    run = cache[cache.size - 1]
+                    // extend the cache as needed
+                    while (cache.size < nexp + 1) {
+                        run *= two
+                        cache.add(run)
+                    }
+                    val expMax = cache[nexp] - one
+                    var exp = (cache[nexp - 1] - one) + BigDecimal(decMove)
+                    if (exp >= expMax) {
+                        done = 2 // round up to infinity
+                        break@process
+                    } else {
+                        // Convert exp into binary while translating value into bits array
+                        for (i in nexp - 1 downTo 0) {
+                            if (exp >= cache[i]) {
+                                exp -= cache[i]
+                                bits[nexp - i] = true
+                            }
                         }
                     }
+                } else {
+
                 }
                 // finally, set the mantissa, which is a straight copy across from bin (except leading 1)
                 for (i in 1 until min(bin.size, nmant + 1))
@@ -189,10 +208,19 @@ class NumberHandler {
         return ret.toString()
     }
 
-    fun toDecimal(binNum: String, nexp: Int, nmant: Int): String {
+    /**
+     * Produces a decimal value (as a string) representing the given binary, with the given number of exponent and
+     * mantissa bits (and the assumed 1 sign bit)
+     * @param binNum the number in binary to translate into decimal
+     * @param nexp the number of exponent bits in the floating point configuration. (The number of mantissa bits is
+     * deduced since there must be 1 sign bit and all other bits must be mantissa.)
+     * @param the decimal value (as a string) equivalent to the input binary float
+     */
+    fun toDecimal(binNum: String, nexp: Int): String {
+        val nmant = binNum.length - (1 + nexp)
+
         var expBits = BigInteger("0")
         var expRun = BigInteger("1")
-        val one = BigInteger("1")
         val itwo = BigInteger("2")
         var special = true
         var denormal = true
@@ -215,8 +243,12 @@ class NumberHandler {
             // If we get here, no mantissa bits were set
             return if (binNum[0] == '0') "inf" else "-inf"
         }
-        val expDiff = expRun - one
-        val exp = expBits - expDiff
+        val one = BigInteger("1")
+        val expDiff = expRun - one  // expDiff = 2^nexp - 1
+        var exp = expBits - expDiff
+        // If the number is a denormal, the exp is actually one higher
+        if (denormal) // In other words, the min exp is 1 - expDiff (shared by 0 and 1)
+            exp += one
         // expVal = 2 ^ exp
         var expVal = BigDecimal(1)
         var count = BigInteger("0")
@@ -336,6 +368,17 @@ class NumberHandler {
         return two.pow(mantissas + 1).toString()
     }
 
+    /**
+     * Returns the binary float which is one unit of least precision different from the binary float source. In some
+     * special cases (such as inf or nan), the return should be the same as the source.
+     * Note that this is not a simple binary addition/subtraction because NaN cannot be added or subtracted from, inf
+     * and -inf are the max and min, respectively, and there is a jump in the binary representation between 0 and -0
+     * (which in this context count as 1 ULP difference).
+     * @param binSrc the binary float to increment/decrement
+     * @param exponents the number of exponent bits in the float configuration. There must be 1 leading sign bit, and
+     * the number of mantissa bits is assumed from the length of the binary source
+     * @param direction the direction to increment. If direction == true, +1. If direction == false, -1.
+     */
     fun increment(binSrc: String, exponents: Int, direction: Boolean): String {
         val bin = binSrc.filter {it != ' '}
         val bits = BooleanArray(bin.length) {bin[it] == '1'}
