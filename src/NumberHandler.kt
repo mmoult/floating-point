@@ -72,131 +72,161 @@ class NumberHandler {
             bits[0] = true
             dec = decNum.substring(1)
         }
-        var done = 0
+        var expOn = false
         if (dec == "inf" || dec == "nan") {
             if (dec == "nan") {
                 // Set one of the mantissa bits.
                 // Since it doesn't make any difference which, set the first
                 bits[nexp + 1] = true
             }
-            done = 2
+            expOn = true
         }else if (dec.isEmpty() || dec.contains('i') || dec.contains('n')
             || dec.contains('f') || dec.contains('a'))
             dec = "0" // error turns to 0
 
-        process@while (done == 0) {
-            // Convert the whole number to binary
+        expAndMant@while (!expOn) {
+            // Convert the number into binary
             var decc = BigDecimal(dec)
-            val zero = BigDecimal(0)
-            // If our decimal number is 0, we are done. 0 = all off
-            if (decc.compareTo(zero) != 0) {
-                val one = BigDecimal(1)
-                val two = BigDecimal(2)
-                var run = one
-                val cache = ArrayList<BigDecimal>(nexp + 1)
-                cache.add(one)
-                while (decc >= run) {
-                    run *= two
-                    cache.add(run)
-                }
-                val bin = ArrayList<Boolean>()
-                var denormal = true
-                var earlyBreak = 0
-                // No entry at size. Skip size-1 since it is larger than the input.
-                // Therefore, start with size-2
-                for (i in cache.size - 2 downTo 0) {
-                    if (bin.size > nmant) { // don't go further than our precision allows
-                        earlyBreak = i + 1
-                        break
-                    }else if (decc >= cache[i]) {
-                        bin.add(true)
-                        decc -= cache[i]
-                        denormal = false
-                    }else
-                        bin.add(false)
-                }
-                // The decimal is at bin.size, but we need to move it to scientific notation,
-                // which leaves just a 1 (or a 0 for denormal mode) before it
-                var decMove = bin.size + earlyBreak - 1
-                if (decc > zero) {
-                    // Continue where possible to refine the current mantissa value
-                    if (earlyBreak == 0) {
-                        // If we did not break early, we may have more precision bits to use. Thus, go into the decimal
-                        run = one
-                        while (decc > zero) {
-                            run = run.divide(two, MathContext.UNLIMITED)
-                            // Don't need to go further than our precision will allow
-                            if (bin.size > nmant)
-                                break
+            if (decc == BigDecimal.ZERO)
+                break // no exponent or mantissa bits need to be set for 0 or -0
+            val two = BigDecimal(2)
 
-                            if (decc >= run) {
-                                decc -= run
-                                bin.add(true)
-                                denormal = false // no longer counting decimal moves
-                            } else {
-                                if (denormal)
-                                    decMove--
-                                else
-                                    bin.add(false)
-                            }
-                        }
-                    }else
-                        run = cache[earlyBreak - 1]
+            val bin = ArrayList<Boolean>()
+            var expVal = 0
+            var unplace = true
+            var denormal = false
 
-                    // If we still aren't exactly there, try rounding the bits we currently have
-                    if (decc > zero && decc >= run) {
-                        for (i in bin.size - 1 downTo 0) {
-                            // look for a 0
-                            if (!bin[i]) {
-                                // Flip this bit and set all after to !add
-                                bin[i] = true
-                                for (j in i + 1 until bin.size)
-                                    bin[j] = false
-                                break
-                            }
-                        }
-                        // If all the bin bits were true, we cannot round (next num is inf)
-                    }
-                }
-
-                // Now we need to create the exponent:
-                // (2 ^ nexp) - 1 + decMove = exponent
-                // If exponent >= 2 ^ (nexp + 1) - 1, we round to infinity
-                // (Recall we cannot have all exponent bits on since that is inf or nan.)
-
-                if (decMove >= 0) { // if not denormal
-                    // We kept a cache of powers of two earlier. Use it to fetch the values needed now
-                    run = cache[cache.size - 1]
-                    // extend the cache as needed
-                    while (cache.size < nexp + 1) {
-                        run *= two
+            var run = BigDecimal.ONE
+            binGen@do {
+                if (decc >= BigDecimal.ONE) {
+                    // Keep going until our running value is greater than the decimal value. Once we have a higher
+                    // number, we can go downward, reusing the cached values we calculated first.
+                    // We don't need to add the number larger than decc to the cache since we don't need to use it again
+                    // (just see it, so we know we don't have to go any higher.)
+                    val cache = ArrayList<BigDecimal>(nexp)
+                    do {
                         cache.add(run)
-                    }
-                    val expMax = cache[nexp] - one
-                    var exp = (cache[nexp - 1] - one) + BigDecimal(decMove)
-                    if (exp >= expMax) {
-                        done = 2 // round up to infinity
-                        break@process
-                    } else {
-                        // Convert exp into binary while translating value into bits array
-                        for (i in nexp - 1 downTo 0) {
-                            if (exp >= cache[i]) {
-                                exp -= cache[i]
-                                bits[nexp - i] = true
-                            }
+                        run *= two
+                    } while (decc >= run)
+                    expVal = cache.size - 1
+
+                    // Since we know that our decimal is larger than 1, we CANNOT use denormal
+                    unplace = false
+                    // Because we cache run until it is larger than decc, we know that cache[size - 1] <= decc
+                    decc -= cache[cache.size - 1]
+                    for (i in cache.size - 2 downTo 0) {
+                        if (decc >= cache[i]) {
+                            bin.add(true)
+                            decc -= cache[i]
+                            if (decc == BigDecimal.ZERO) // exact match!
+                                break
+                        }else
+                            bin.add(false)
+
+                        if (bin.size >= nmant) {
+                            // Update run so it is ready for rounding
+                            run = if (i > 0)
+                                cache[i - 1]
+                            else
+                                BigDecimal.ONE.divide(two, MathContext.UNLIMITED)
+                            break@binGen // don't go further than our precision allows
                         }
                     }
-                } else {
-
                 }
-                // finally, set the mantissa, which is a straight copy across from bin (except leading 1)
-                for (i in 1 until min(bin.size, nmant + 1))
-                    bits[nexp + i] = bin[i]
+
+                // Now we manage the decimal component (if remainder)
+                if (decc == BigDecimal.ZERO)
+                    break
+
+                var moveMax = 1 // The number of moves before unplace is forced off (for denormals)
+                if (unplace) {
+                    // If we don't know whether to use denormal or not, find out how many negative powers of two are
+                    // allowed in normal mode
+                    // Unfortunately, there is no exponentiation operator in Kotlin
+                    for (i in 1 until nexp)
+                        moveMax *= 2
+                    moveMax -= 2
+                }
+
+                run = BigDecimal.ONE.divide(two, MathContext.UNLIMITED)
+                var moves = 0
+                do {
+                    if (unplace) {
+                        if (moves >= moveMax) {
+                            unplace = false
+                            denormal = true
+                        }else
+                            moves++ // only need to keep track of moves if exponent isn't decided
+                    }
+
+                    if (decc >= run) {
+                        decc -= run
+                        if (unplace) {
+                            unplace = false
+                            expVal = -moves
+                            // don't add the leading one (since this isn't denormal)
+                        } else
+                            bin.add(true)
+                    }else {
+                        // if we still haven't selected an exponent (maybe using denormal), don't print anything
+                        if (!unplace)
+                            bin.add(false)
+                    }
+
+                    // Update run last since it must be ready for use in rounding
+                    run = run.divide(two, MathContext.UNLIMITED)
+                } while (decc > BigDecimal.ZERO && bin.size < nmant)
+            } while (false)
+
+            // If the representation wasn't exact, try rounding
+            if (decc > BigDecimal.ZERO && decc >= run) {
+                for (i in bin.size - 1 downTo 0) {
+                    // look for a 0
+                    if (!bin[i]) {
+                        // Flip this bit and set all after to !add
+                        bin[i] = true
+                        for (j in i + 1 until bin.size)
+                            bin[j] = false
+                        break
+                    }
+                }
+                // If all the bin bits were true, we cannot round (next num is inf)
             }
-            done = 1
+
+            // Now we need to create the exponent:
+            if (!denormal) {
+                // (2 ^ (nexp - 1)) - 1 + expVal = exponent
+                // If exponent >= 2 ^ nexp - 1, we round to infinity
+                // (Recall we cannot have all exponent bits on since that is inf or nan.)
+                val pow2 = Array(nexp + 1) {0}
+                pow2[0] = 1
+                for (i in 1 until pow2.size)
+                    pow2[i] = pow2[i - 1] * 2
+
+                var exponent = pow2[nexp - 1] - 1 + expVal
+                if (exponent >= pow2[nexp] - 1) {
+                    expOn = true
+                    break@expAndMant
+                }
+
+                // Convert exp into binary while translating value into bits array
+                for (i in nexp - 1 downTo 0) {
+                    if (exponent >= pow2[i]) {
+                        exponent -= pow2[i]
+                        bits[nexp - i] = true
+                    }
+                }
+            }
+
+            // finally, set the mantissa, which is a straight copy across from bin
+            val firstMant = nexp + 1
+            for (i in 0 until bin.size)
+                bits[firstMant + i] = bin[i]
+
+            break
         }
 
-        if (done == 2) {
+        if (expOn) {
             // Set all exponent bits
             for (i in 1..nexp)
                 bits[i] = true
@@ -214,7 +244,7 @@ class NumberHandler {
      * @param binNum the number in binary to translate into decimal
      * @param nexp the number of exponent bits in the floating point configuration. (The number of mantissa bits is
      * deduced since there must be 1 sign bit and all other bits must be mantissa.)
-     * @param the decimal value (as a string) equivalent to the input binary float
+     * @return the decimal value (as a string) equivalent to the input binary float
      */
     fun toDecimal(binNum: String, nexp: Int): String {
         val nmant = binNum.length - (1 + nexp)
@@ -243,6 +273,7 @@ class NumberHandler {
             // If we get here, no mantissa bits were set
             return if (binNum[0] == '0') "inf" else "-inf"
         }
+
         val one = BigInteger("1")
         val expDiff = expRun - one  // expDiff = 2^nexp - 1
         var exp = expBits - expDiff

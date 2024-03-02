@@ -42,7 +42,14 @@ internal class NumberHandlerTest {
             assertEquals(match.bin, handler.fromDecimal(match.dec, match.exponents, match.mantissas))
 
         // There are plenty of one-directional tests since not every decimal can be evenly mapped onto the float config
-        // TODO
+        assertEquals("00111101110011001100110011001101", // demonstrates rounding of subnormal
+            handler.fromDecimal("0.1", 8, 23))
+        assertEquals("01001110100100110010110000000110", // reach precision limit of large mantissa
+            handler.fromDecimal("1234567890", 8, 23))
+        assertEquals("01001011001111000110000101010000", // mantissa limit at edge (i == 0)
+            handler.fromDecimal("12345679.5", 8, 23))
+        assertEquals("0111110000000000", // too big, rounded to inf
+            handler.fromDecimal("70000", 5, 10))
     }
 
     @Test
@@ -59,5 +66,6 @@ internal class NumberHandlerTest {
 
     @Test
     fun increment() {
+        // TODO
     }
 }
