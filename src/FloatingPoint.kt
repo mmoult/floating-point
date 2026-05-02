@@ -16,7 +16,10 @@ fun main() {
 class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotionListener, MouseWheelListener {
     private val frame: JFrame = JFrame("floating-point")
     private var manager: MenuManager = FpMenuManager(this)
+
     private var running = false
+    private var nextRender : Long = 0
+    private val refresh = 250 // 1000 ms = 1 sec. 1000 / 250 = 4 fps
 
     init {
         frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
@@ -37,18 +40,17 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
     }
 
     private fun run() {
-        val refresh = 250 // 1000 ms = 1 sec. 1000 / 250 = 4 fps
-        var currentTime: Long
-        var lastTime = System.currentTimeMillis()
         running = true
+
         while (running) {
-            currentTime = System.currentTimeMillis()
-            if (currentTime > refresh + lastTime) {
+            val currentTime = System.currentTimeMillis()
+            if (currentTime >= nextRender) {
                 this.repaint()
-                lastTime = System.currentTimeMillis()
             } else {
                 try {
-                    Thread.sleep(refresh + lastTime - currentTime)
+                    val sleepFor = nextRender - currentTime
+                    if (sleepFor > 10)
+                        Thread.sleep(sleepFor)
                 } catch (e: InterruptedException) {
                     e.printStackTrace()
                 }
@@ -59,10 +61,10 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
     override fun paintComponent(g: Graphics?) {
         super.paintComponent(g)
         manager.render(g)
-        requestFocus()
+        nextRender = System.currentTimeMillis() + refresh
     }
 
-    override fun getPreferredSize() = Dimension(500, 250)
+    override fun getPreferredSize() = Dimension(500, 300)
 
     override fun getMenuWidth() = width
 
@@ -84,7 +86,9 @@ class FloatingPoint: JPanel(), Container, MouseListener, KeyListener, MouseMotio
         repaint()
     }
 
-    override fun mouseEntered(e: MouseEvent?) {}
+    override fun mouseEntered(e: MouseEvent?) {
+        requestFocus()
+    }
 
     override fun mouseExited(e: MouseEvent?) {}
 

@@ -1,5 +1,5 @@
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
 
 internal class NumberHandlerTest {
     private val handler = NumberHandler()
@@ -35,33 +35,33 @@ internal class NumberHandlerTest {
         Match("-inf", "11111111100000000000000000000000", 8),
     )
 
-    @Test
-    fun fromDecimal() {
+    @org.junit.jupiter.api.Test
+    fun floatToBin() {
         // do the bidirectional tests
         for (match in bidirectional)
-            assertEquals(match.bin, handler.fromDecimal(match.dec, match.exponents, match.mantissas))
+            assertEquals(match.bin, handler.floatToBin(match.dec, match.exponents, match.mantissas))
 
         // There are plenty of one-directional tests since not every decimal can be evenly mapped onto the float config
         assertEquals("00111101110011001100110011001101", // demonstrates rounding of subnormal
-            handler.fromDecimal("0.1", 8, 23))
+            handler.floatToBin("0.1", 8, 23))
         assertEquals("01001110100100110010110000000110", // reach precision limit of large mantissa
-            handler.fromDecimal("1234567890", 8, 23))
+            handler.floatToBin("1234567890", 8, 23))
         assertEquals("01001011001111000110000101010000", // mantissa limit at edge (i == 0)
-            handler.fromDecimal("12345679.5", 8, 23))
+            handler.floatToBin("12345679.5", 8, 23))
         assertEquals("0111110000000000", // too big, rounded to inf
-            handler.fromDecimal("70000", 5, 10))
+            handler.floatToBin("70000", 5, 10))
     }
 
     @Test
-    fun toDecimal() {
+    fun binToFloat() {
         // do the bidirectional tests
         for (match in bidirectional)
-            assertEquals(match.dec, handler.toDecimal(match.bin, match.exponents))
+            assertEquals(match.dec, handler.binToFloat(match.bin, match.exponents))
 
         // Test a few values which are one directional or not necessarily reversible
-        assertEquals("nan", handler.toDecimal("0111110100000000", 5))
-        assertEquals("nan", handler.toDecimal("1111110000000001", 5)) // no such -nan
-        assertEquals("nan", handler.toDecimal("01111111100000100000000000010000", 8))
+        assertEquals("nan", handler.binToFloat("0111110100000000", 5))
+        assertEquals("nan", handler.binToFloat("1111110000000001", 5)) // no such -nan
+        assertEquals("nan", handler.binToFloat("01111111100000100000000000010000", 8))
     }
 
     @Test

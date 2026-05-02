@@ -10,15 +10,16 @@ import moulton.scalable.texts.TextFormat
 import java.awt.Color
 import java.awt.Font
 
-class FpMenuManager(game: FloatingPoint): MenuManager(game) {
-    private var boxes : Array<TextBox>? = null
-    private var exponent : TextBox? = null
-    private var mantissa : TextBox? = null
+class FpMenuManager(game: FloatingPoint) : MenuManager(game) {
+    private var boxes: Array<TextBox>? = null
+    private var exponent: TextBox? = null
+    private var mantissa: TextBox? = null
 
     override fun createMenu() {
         this.menu = Panel.createRoot(Color.WHITE)
         val font = Font("Arial", Font.PLAIN, 18)
         val topPanel = Panel(menu, 0, 0, null)
+        menu.gridFormatter.specifyRowWeight(0, 3.0)
         // panel for holding precision controls
         val precPanel = Panel(topPanel, 0, 0, Color.YELLOW)
         exponent = addPrecComps(precPanel, "E", 0)
@@ -59,12 +60,15 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         addTouchComponent(negate)
         negate.clickAction = EventAction {
             val prev = boxes!![3].message
-            setBox(3, if (prev.startsWith("-"))
-                prev.substring(1)
-            else
-                "-$prev")
+            setBox(
+                3, if (prev.startsWith("-"))
+                    prev.substring(1)
+                else
+                    "-$prev"
+            )
             true
         }
+
         val addOne = Button("+1", leftButtonsPanel, 1, 1, font, Color.PINK)
         addTouchComponent(addOne)
         addOne.clickAction = EventAction {
@@ -83,25 +87,25 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         val inf = Button("inf", rightButtonsPanel, 0, 0, font, Color.ORANGE)
         addTouchComponent(inf)
         inf.clickAction = EventAction {
-            setBox(3, "inf")
+            setBox(4, "inf")
             true
         }
         val ninf = Button("-inf", rightButtonsPanel, 1, 0, font, Color.ORANGE)
         addTouchComponent(ninf)
         ninf.clickAction = EventAction {
-            setBox(3, "-inf")
+            setBox(4, "-inf")
             true
         }
         val nan = Button("nan", rightButtonsPanel, 2, 0, font, Color.ORANGE)
         addTouchComponent(nan)
         nan.clickAction = EventAction {
-            setBox(3, "nan")
+            setBox(4, "nan")
             true
         }
         val zero = Button("0", rightButtonsPanel, 3, 0, font, Color.ORANGE)
         addTouchComponent(zero)
         zero.clickAction = EventAction {
-            setBox(3, "0")
+            setBox(4, "0")
             true
         }
         // The largest value representable by the float
@@ -115,14 +119,14 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         val integer = Button("int", rightButtonsPanel, 1, 1, font, Color.ORANGE)
         addTouchComponent(integer)
         integer.clickAction = EventAction {
-            setBox(3, handler.intHigh(mantissa!!.message.toInt()))
+            setBox(4, handler.intHigh(mantissa!!.message.toInt()))
             true
         }
         // The lowest point, above which, no deltas below 1 can be represented
         val decb = Button("dec", rightButtonsPanel, 2, 1, font, Color.ORANGE)
         addTouchComponent(decb)
         decb.clickAction = EventAction {
-            setBox(3, handler.decHigh(mantissa!!.message.toInt()))
+            setBox(4, handler.decHigh(mantissa!!.message.toInt()))
             true
         }
         // The lowest denorm value
@@ -137,12 +141,16 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         rightButtonsPanel.gridFormatter.setMargin(space, space)
 
         val gridPan = Panel(this.menu, 0, 1, null)
-        this.menu.gridFormatter.specifyRowWeight(1, 1.5)
+        this.menu.gridFormatter.specifyRowWeight(1, 5.0)
         val partition = "120"
         val captions = Panel(gridPan, "0", "0", partition, "?height", Color.WHITE)
         val boxes = Panel(gridPan, partition, "0", "?width", "?height", Color.WHITE)
         val bin = object : TextFormat() {
             override fun isValidChar(c: Char): Boolean = c == '0' || c == '1' || c == ' '
+            override fun emptyText(): String = "0"
+        }
+        val dec = object : TextFormat() {
+            override fun isValidChar(c: Char): Boolean = (c in '0'..'9') || c == ' '
             override fun emptyText(): String = "0"
         }
         val hex = object : TextFormat() {
@@ -151,11 +159,11 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
 
             override fun emptyText(): String = "0"
         }
-        val dec = object : TextFormat() {
-            var box : TextBox? = null
+        val fp = object : TextFormat() {
+            var box: TextBox? = null
 
             override fun isValidChar(c: Char): Boolean {
-                if (c in '0' .. '9')
+                if (c in '0'..'9')
                     return true
                 var msg = box!!.message
                 if (c == '.') {
@@ -177,7 +185,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                 if (first) {
                     // can see ., i, n here
                     return c == 'i' || c == 'n'
-                }else if (msg == "i" && c == 'n')
+                } else if (msg == "i" && c == 'n')
                     return true
                 else if (msg == "in" && c == 'f')
                     return true
@@ -187,20 +195,23 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                     return true
                 return false
             }
+
             override fun emptyText(): String = "0"
         }
-        val font2 = addRepresentation(captions, 2, "Decimal")
+        val font2 = addRepresentation(captions, 3, "Exact")
         this.boxes = arrayOf(
             addRepresentation(captions, boxes, 0, "Binary", bin),
             addRepresentation(captions, boxes, 1, "Hexadecimal", hex),
-            StaticTextBox("0", boxes, 0, 2, font2, Color.WHITE),
-            addRepresentation(captions, boxes, 3, "Pretty", dec))
-        dec.box = this.boxes!![3]
+            addRepresentation(captions, boxes, 2, "Decimal", dec),
+            StaticTextBox("0", boxes, 0, 3, font2, Color.WHITE),
+            addRepresentation(captions, boxes, 4, "Pretty", fp)
+        )
+        fp.box = this.boxes!![4]
 
         // start with FP32
         exponent!!.message = "8"
         mantissa!!.message = "23"
-        refresh(3, false)
+        refresh()
     }
 
     private fun addPrecComps(precPanel: Panel, label: String, offs: Int): TextBox {
@@ -225,7 +236,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         val up = Button("^", updownPanel, 0, 0, font, Color.GRAY)
         up.clickAction = EventAction {
             box.message = (box.message.toInt() + 1).toString()
-            refresh(3)
+            refresh()
             true
         }
         addTouchComponent(up)
@@ -234,7 +245,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
             val num = box.message.toInt()
             if (num > 1)
                 box.message = (num - 1).toString()
-            refresh(3)
+            refresh()
             true
         }
         addTouchComponent(down)
@@ -254,6 +265,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         box.textFormat = tf
         return box
     }
+
     private fun addRepresentation(captions: Panel, i: Int, type: String): Font {
         val font = Font("Arial", Font.PLAIN, 18)
         Caption(" $type:", captions, 0, i, font, Alignment.LEFT_ALIGNMENT)
@@ -265,7 +277,7 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         refresh(which)
     }
 
-    private fun refresh(trigger: Int = 3, setExact: Boolean = false) {
+    private fun refresh(trigger: Int = 4, setExact: Boolean = false) {
         val msg = boxes!![trigger].message.filterNot { it.isWhitespace() }
         val exponents = this.exponent!!.message.toInt()
         val mantissas = this.mantissa!!.message.toInt()
@@ -274,13 +286,14 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
         // binMsg must have the correct length: pad if necessary
         val binMsg = when (trigger) {
             0 -> handler.padBinary(msg, digits) // fetch the binary directly
-            1 -> handler.fromHex(msg, digits) // hex
-            3 -> handler.fromDecimal(msg, exponents, mantissas) // exact decimal
+            1 -> handler.hexToBin(msg, digits) // hex
+            2 -> handler.decToBin(msg, digits) // base 10
+            4 -> handler.floatToBin(msg, exponents, mantissas) // exact floating-point
             else -> throw RuntimeException("Unhandled trigger type!")
         }
         // update all fields except exact (if it was the trigger)
-        val inDec = handler.toDecimal(binMsg, exponents)
-        for (i in 0..3) {
+        val inDec = handler.binToFloat(binMsg, exponents)
+        for (i in 0..4) {
             when (i) {
                 0 -> {
                     // Now we want to split it up to isolate the three components: sign, exponent, mantissa
@@ -290,12 +303,13 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                     buf.append(binMsg.substring(1..exponents))
                     buf.append(' ')
                     buf.append(binMsg.substring(exponents + 1))
-                    boxes!![0].message = buf.toString()
+                    boxes!![i].message = buf.toString()
                 }
+
                 1 -> {
                     val buf = StringBuilder()
                     for (j in binMsg.indices step 4) {
-                        val read = binMsg.substring(j until minOf(binMsg.length, j + 4))
+                        val read = binMsg.substring(j..<minOf(binMsg.length, j + 4))
                         var hex = 0
                         var run = 1
                         for (k in read.length - 1 downTo 0) {
@@ -303,21 +317,26 @@ class FpMenuManager(game: FloatingPoint): MenuManager(game) {
                                 hex += run
                             run *= 2
                         }
-                       if (j > 0 && j % 16 == 0)
-                           buf.append(' ')
+                        if (j > 0 && j % 16 == 0)
+                            buf.append(' ')
 
                         if (hex < 10)
                             buf.append('0' + hex)
                         else
                             buf.append('A' + (hex - 10))
                     }
-                    boxes!![1].message = buf.toString()
+                    boxes!![i].message = buf.toString()
                 }
-                2 -> boxes!![2].message = inDec
-                3 -> {
-                    if (!setExact && trigger == 3)
+
+                2 -> {
+                    boxes!![i].message = handler.binToDec(binMsg)
+                }
+
+                3 -> boxes!![i].message = inDec
+                4 -> {
+                    if (!setExact && trigger == 4)
                         continue
-                    boxes!![3].message = inDec
+                    boxes!![i].message = inDec
                 }
             }
         }

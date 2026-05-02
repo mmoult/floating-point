@@ -1,7 +1,6 @@
 import java.math.BigDecimal
 import java.math.BigInteger
 import java.math.MathContext
-import kotlin.math.min
 
 class NumberHandler {
     fun padBinary(binNum: String, digits: Int): String {
@@ -11,8 +10,7 @@ class NumberHandler {
         if (diff < 0)
             return binNum.substring(0, digits)
         val ret = StringBuilder(digits)
-        for (i in 0 until diff)
-            ret.append('0')
+        repeat(diff) { ret.append('0') }
         ret.append(binNum)
         return ret.toString()
     }
@@ -24,7 +22,7 @@ class NumberHandler {
      * zeros. If the hexadecimal string is too long, it will be truncated.
      * @return the equivalent binary from the input hex
      */
-    fun fromHex(hexNum: String, digits: Int): String {
+    fun hexToBin(hexNum: String, digits: Int): String {
         val bin = StringBuilder(digits)
         val hex = if (hexNum.length * 4 > digits)
             hexNum.substring(0, digits / 4)
@@ -32,38 +30,40 @@ class NumberHandler {
             hexNum
         for (c in hex) {
             val cc = if (c <= 'Z') c else (c - ('a' - 'A'))
-            bin.append(when (cc) {
-                '0' -> "0000"
-                '1' -> "0001"
-                '2' -> "0010"
-                '3' -> "0011"
-                '4' -> "0100"
-                '5' -> "0101"
-                '6' -> "0110"
-                '7' -> "0111"
-                '8' -> "1000"
-                '9' -> "1001"
-                'A' -> "1010"
-                'B' -> "1011"
-                'C' -> "1100"
-                'D' -> "1101"
-                'E' -> "1110"
-                'F' -> "1111"
-                else -> throw RuntimeException("Invalid char found in hex string!")
-            })
+            bin.append(
+                when (cc) {
+                    '0' -> "0000"
+                    '1' -> "0001"
+                    '2' -> "0010"
+                    '3' -> "0011"
+                    '4' -> "0100"
+                    '5' -> "0101"
+                    '6' -> "0110"
+                    '7' -> "0111"
+                    '8' -> "1000"
+                    '9' -> "1001"
+                    'A' -> "1010"
+                    'B' -> "1011"
+                    'C' -> "1100"
+                    'D' -> "1101"
+                    'E' -> "1110"
+                    'F' -> "1111"
+                    else -> throw RuntimeException("Invalid char found in hex string!")
+                }
+            )
         }
         return padBinary(bin.toString(), digits)
     }
 
     /**
-     * Produces a binary string equivalent to the input decimal number (given as a string).
-     * @param decNum the decimal number to convert into float binary
+     * Produces a binary string equivalent to the input floating-point number (given as a string).
+     * @param decNum the decimal floating-point number to convert into float binary
      * @param nexp the number of exponent bits given by the floating point configuration
      * @param nmant the number of mantissa bits given by the floating point configuration
      * @return the equivalent string in binary. It is assumed that one bit is allowed for the sign and that the three
      * components (sign, exponent, mantissa), are in that order.
      */
-    fun fromDecimal(decNum: String, nexp: Int, nmant: Int): String {
+    fun floatToBin(decNum: String, nexp: Int, nmant: Int): String {
         val bits = Array(nexp + nmant + 1) { false }
         var dec = decNum
 
@@ -80,11 +80,12 @@ class NumberHandler {
                 bits[nexp + 1] = true
             }
             expOn = true
-        }else if (dec.isEmpty() || dec.contains('i') || dec.contains('n')
-            || dec.contains('f') || dec.contains('a'))
+        } else if (dec.isEmpty() || dec.contains('i') || dec.contains('n')
+            || dec.contains('f') || dec.contains('a')
+        )
             dec = "0" // error turns to 0
 
-        expAndMant@while (!expOn) {
+        expAndMant@ while (!expOn) {
             // Convert the number into binary
             var decc = BigDecimal(dec)
             if (decc == BigDecimal.ZERO)
@@ -97,7 +98,7 @@ class NumberHandler {
             var denormal = false
 
             var run = BigDecimal.ONE
-            binGen@do {
+            binGen@ do {
                 if (decc >= BigDecimal.ONE) {
                     // Keep going until our running value is greater than the decimal value. Once we have a higher
                     // number, we can go downward, reusing the cached values we calculated first.
@@ -120,7 +121,7 @@ class NumberHandler {
                             decc -= cache[i]
                             if (decc == BigDecimal.ZERO) // exact match!
                                 break
-                        }else
+                        } else
                             bin.add(false)
 
                         if (bin.size >= nmant) {
@@ -143,8 +144,7 @@ class NumberHandler {
                     // If we don't know whether to use denormal or not, find out how many negative powers of two are
                     // allowed in normal mode
                     // Unfortunately, there is no exponentiation operator in Kotlin
-                    for (i in 1 until nexp)
-                        moveMax *= 2
+                    repeat(nexp - 1) { moveMax *= 2 }
                     moveMax -= 2
                 }
 
@@ -155,7 +155,7 @@ class NumberHandler {
                         if (moves >= moveMax) {
                             unplace = false
                             denormal = true
-                        }else
+                        } else
                             moves++ // only need to keep track of moves if exponent isn't decided
                     }
 
@@ -167,7 +167,7 @@ class NumberHandler {
                             // don't add the leading one (since this isn't denormal)
                         } else
                             bin.add(true)
-                    }else {
+                    } else {
                         // if we still haven't selected an exponent (maybe using denormal), don't print anything
                         if (!unplace)
                             bin.add(false)
@@ -198,9 +198,9 @@ class NumberHandler {
                 // (2 ^ (nexp - 1)) - 1 + expVal = exponent
                 // If exponent >= 2 ^ nexp - 1, we round to infinity
                 // (Recall we cannot have all exponent bits on since that is inf or nan.)
-                val pow2 = Array(nexp + 1) {0}
+                val pow2 = Array(nexp + 1) { 0 }
                 pow2[0] = 1
-                for (i in 1 until pow2.size)
+                for (i in 1..<pow2.size)
                     pow2[i] = pow2[i - 1] * 2
 
                 var exponent = pow2[nexp - 1] - 1 + expVal
@@ -220,7 +220,7 @@ class NumberHandler {
 
             // finally, set the mantissa, which is a straight copy across from bin
             val firstMant = nexp + 1
-            for (i in 0 until bin.size)
+            for (i in 0..<bin.size)
                 bits[firstMant + i] = bin[i]
 
             break
@@ -239,14 +239,14 @@ class NumberHandler {
     }
 
     /**
-     * Produces a decimal value (as a string) representing the given binary, with the given number of exponent and
+     * Produces a floating-point decimal representation for the given binary, with the given number of exponent and
      * mantissa bits (and the assumed 1 sign bit)
      * @param binNum the number in binary to translate into decimal
      * @param nexp the number of exponent bits in the floating point configuration. (The number of mantissa bits is
      * deduced since there must be 1 sign bit and all other bits must be mantissa.)
      * @return the decimal value (as a string) equivalent to the input binary float
      */
-    fun toDecimal(binNum: String, nexp: Int): String {
+    fun binToFloat(binNum: String, nexp: Int): String {
         val nmant = binNum.length - (1 + nexp)
 
         var expBits = BigInteger("0")
@@ -258,7 +258,7 @@ class NumberHandler {
             if (binNum[i] == '1') {
                 expBits += expRun
                 denormal = false
-            }else
+            } else
                 special = false
             if (i > 1) // do not double on last iteration
                 expRun *= itwo
@@ -266,7 +266,7 @@ class NumberHandler {
         if (special) {
             // All exponent bits set signals special
             // If any of the mantissa bits are set, this is nan, else, inf or -inf
-            for (i in (nexp + 1) until (nexp + nmant + 1)) {
+            for (i in (nexp + 1)..<(nexp + nmant + 1)) {
                 if (binNum[i] == '1')
                     return "nan" // there is no such thing as -nan, so don't check sign bit
             }
@@ -289,7 +289,7 @@ class NumberHandler {
                 expVal *= two
                 count += one
             }
-        }else {
+        } else {
             while (exp < count) {
                 expVal = expVal.divide(two, MathContext.UNLIMITED)
                 count -= one
@@ -298,7 +298,7 @@ class NumberHandler {
 
         var mantissa = if (denormal) BigDecimal(0) else BigDecimal(1)
         var mantRun = BigDecimal("0.5")
-        for (i in (nexp + 1) .. (nexp + nmant)) {
+        for (i in (nexp + 1)..(nexp + nmant)) {
             if (binNum[i] == '1')
                 mantissa += mantRun
             mantRun = mantRun.divide(two, MathContext.UNLIMITED)
@@ -326,16 +326,45 @@ class NumberHandler {
         return combo
     }
 
+    fun decToBin(msg: String, digits: Int): String {
+        var remainder = BigInteger(msg)
+        var place = BigInteger.valueOf(1)
+        val two = BigInteger.valueOf(2)
+        repeat(digits - 1) {
+            place *= two
+        }
+        val res = StringBuilder()
+        repeat(digits) {
+            if (place <= remainder) {
+                res.append('1')
+                remainder -= place
+            } else
+                res.append('0')
+            place /= two
+        }
+        return res.toString()
+    }
+
+    fun binToDec(binMsg: String): String {
+        var sum = BigInteger.valueOf(0)
+        var place = BigInteger.valueOf(1)
+        val two = BigInteger.valueOf(2)
+        for (bit in binMsg.reversed()) {
+            if (bit == '1')
+                sum += place
+            place *= two
+        }
+        return sum.toString()
+    }
+
     /**
      * The smallest denormal value
      */
     fun denormLow(exponents: Int, mantissas: Int): String {
         val num = StringBuilder(1 + exponents + mantissas)
         num.append('0')
-        for (i in 0 until exponents)
-            num.append('0')
-        for (i in 0 until mantissas - 1)
-            num.append('0')
+        repeat(exponents) { num.append('0') }
+        repeat(mantissas - 1) { num.append('0') }
         num.append('1')
         return num.toString()
     }
@@ -346,24 +375,8 @@ class NumberHandler {
     fun denormHigh(exponents: Int, mantissas: Int): String {
         val num = StringBuilder(1 + exponents + mantissas)
         num.append('0')
-        for (i in 0 until exponents)
-            num.append('0')
-        for (i in 0 until mantissas)
-            num.append('1')
-        return num.toString()
-    }
-
-    /**
-     * The smallest (positive) non-denormal value
-     */
-    fun low(exponents: Int, mantissas: Int): String {
-        val num = StringBuilder(1 + exponents + mantissas)
-        num.append('0')
-        for (i in 0 until exponents - 1)
-            num.append('0')
-        num.append('1') // this will be inf if there is only 1 exponent bit
-        for (i in 0 until mantissas)
-            num.append('0')
+        repeat(exponents) { num.append('0') }
+        repeat(mantissas) { num.append('1') }
         return num.toString()
     }
 
@@ -373,11 +386,9 @@ class NumberHandler {
     fun max(exponents: Int, mantissas: Int): String {
         val num = StringBuilder(1 + exponents + mantissas)
         num.append('0')
-        for (i in 0 until exponents - 1)
-            num.append('1')
+        repeat(exponents - 1) { num.append('1') }
         num.append('0')
-        for (i in 0 until mantissas)
-            num.append('1')
+        repeat(mantissas) { num.append('1') }
         return num.toString()
     }
 
@@ -402,17 +413,17 @@ class NumberHandler {
     /**
      * Returns the binary float which is one unit of least precision different from the binary float source. In some
      * special cases (such as inf or nan), the return should be the same as the source.
-     * Note that this is not a simple binary addition/subtraction because NaN cannot be added or subtracted from, inf
-     * and -inf are the max and min, respectively, and there is a jump in the binary representation between 0 and -0
-     * (which in this context count as 1 ULP difference).
+     * Note that this is not a simple binary addition/subtraction. NaN cannot be added or subtracted from, inf and -inf
+     * are the max and min, respectively, and there is a jump in the binary representation between 0 and -0 (which in
+     * this context counts as 1 ULP difference).
      * @param binSrc the binary float to increment/decrement
      * @param exponents the number of exponent bits in the float configuration. There must be 1 leading sign bit, and
      * the number of mantissa bits is assumed from the length of the binary source
      * @param direction the direction to increment. If direction == true, +1. If direction == false, -1.
      */
     fun increment(binSrc: String, exponents: Int, direction: Boolean): String {
-        val bin = binSrc.filter {it != ' '}
-        val bits = BooleanArray(bin.length) {bin[it] == '1'}
+        val bin = binSrc.filter { it != ' ' }
+        val bits = BooleanArray(bin.length) { bin[it] == '1' }
 
         /* Scale of representable float numbers (direction from top to bottom):
         -inf  = 1 1..1 0..0
@@ -441,7 +452,7 @@ class NumberHandler {
         // First, check for inf (for add) and 0 (for sub)
         val stop = if (add) (exponents + 1) else bits.size
         var special = true
-        for (i in 1 until stop) {
+        for (i in 1..<stop) {
             if (bits[i] != add) {
                 // For add, at least one of the bits is off = no inf
                 // For sub, at least one of the bits is on  = no zero
@@ -456,7 +467,7 @@ class NumberHandler {
                 bits[0] = !neg
             }
             // Else, add on infinity, which should be ignored
-        }else {
+        } else {
             // Regular case to either add or subtract (without worry of rollover)
             // do not allow modification of the 0th/sign bit (prefix size = 1)
             for (i in bits.size - 1 downTo 1) {
@@ -465,7 +476,7 @@ class NumberHandler {
                 if (bits[i] != add) {
                     // Flip this bit and set all after to !add
                     bits[i] = !bits[i]
-                    for (j in i + 1 until bits.size)
+                    for (j in i + 1..<bits.size)
                         bits[j] = !add
                     break
                 }
